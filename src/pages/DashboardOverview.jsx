@@ -1,40 +1,19 @@
 import React, { useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, GraduationCap, Building2, TrendingUp, Presentation } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Users, GraduationCap, Building2, TrendingUp, Presentation, ArrowRight } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardOverview() {
   const { facultyData, studentData, filters, setFilters } = useData();
   const navigate = useNavigate();
 
-  // Protect empty screens entirely
   if (!facultyData.length && !studentData.length) return null;
 
-  const handleCardClick = (filterUpdate, route) => {
-      setFilters(prev => ({ ...prev, ...filterUpdate }));
+  const handleCardClick = (route, yearFilter) => {
+      setFilters(prev => ({ ...prev, academicYear: yearFilter }));
       navigate(route);
   };
-
-  // Compile active aggregate numbers for the most recent/selected year filter
-  const activeYearText = filters.academicYear && filters.academicYear !== 'All' ? filters.academicYear : 'All Years';
-  
-  const activeFaculty = facultyData.filter(f => activeYearText === 'All Years' || f.academicYear === activeYearText);
-  const activeStudents = studentData.filter(s => activeYearText === 'All Years' || s.academicYear === activeYearText);
-
-  // Deep Demographic Computations for Top Cards
-  const totalFacultyCount = activeFaculty.length;
-  const totalStudentCount = activeStudents.length;
-
-  const phDCount = activeFaculty.filter(f => f.phdStatus?.toLowerCase().includes('yes')).length;
-  const femaleStudentCount = activeStudents.filter(s => {
-      let g = s.GENDER ? s.GENDER.toString().toLowerCase() : '';
-      return g === 'female' || g === 'f';
-  }).length;
-  const maleStudentCount = activeStudents.filter(s => {
-      let g = s.GENDER ? s.GENDER.toString().toLowerCase() : '';
-      return g === 'male' || g === 'm';
-  }).length;
 
   // Compile Year-by-Year Visualization Arrays for Charting
   const yearWiseData = useMemo(() => {
@@ -43,149 +22,134 @@ export default function DashboardOverview() {
      // Map faculty records
      facultyData.forEach(f => {
          const y = f.academicYear || 'Unknown';
-         if (!dataMap[y]) dataMap[y] = { name: y, Faculty: 0, Students: 0 };
+         if (y === 'Unknown') return;
+         if (!dataMap[y]) dataMap[y] = { name: y, Faculty: 0, Students: 0, PhD: 0, Male: 0, Female: 0 };
          dataMap[y].Faculty += 1;
+         if (f.phdStatus?.toLowerCase().includes('yes')) dataMap[y].PhD += 1;
      });
      
      // Map student records
      studentData.forEach(s => {
          const y = s.academicYear || 'Unknown';
-         if (!dataMap[y]) dataMap[y] = { name: y, Faculty: 0, Students: 0 };
+         if (y === 'Unknown') return;
+         if (!dataMap[y]) dataMap[y] = { name: y, Faculty: 0, Students: 0, PhD: 0, Male: 0, Female: 0 };
          dataMap[y].Students += 1;
+         
+         const g = s.GENDER ? s.GENDER.toString().toLowerCase() : '';
+         if (g === 'female' || g === 'f') dataMap[y].Female += 1;
+         if (g === 'male' || g === 'm') dataMap[y].Male += 1;
      });
      
-     // Return sorted array
-     const chartData = Object.values(dataMap).sort((a, b) => a.name.localeCompare(b.name));
-     
-     // Filter out 'Unknown' if we have actual years
-     return chartData.filter(d => d.name !== 'Unknown' || chartData.length === 1);
+     return Object.values(dataMap).sort((a, b) => a.name.localeCompare(b.name));
   }, [facultyData, studentData]);
 
-  // Aggregate student courses
-  const topCourses = useMemo(() => {
-     let courses = {};
-     activeStudents.forEach(s => {
-         const cName = s.CourseName || 'Unassigned';
-         courses[cName] = (courses[cName] || 0) + 1;
-     });
-     return Object.entries(courses)
-                  .sort((a, b) => b[1] - a[1])
-                  .slice(0, 5) // top 5
-                  .map(([name, count]) => ({ name, count }));
-  }, [activeStudents]);
+  const activeYearText = filters.academicYear && filters.academicYear !== 'All' ? filters.academicYear : 'All Years';
+  
+  const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f59e0b'];
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center" style={{ marginBottom: '2rem' }}>
+    <div className="animate-fade-in" style={{ paddingBottom: '3rem' }}>
+      <div className="flex justify-between items-center" style={{ marginBottom: '2.5rem' }}>
         <div>
-           <h1 className="text-h1">Institutional Overview Dashboard</h1>
-           <p className="text-muted" style={{ marginTop: '0.25rem' }}>Visualizing metrics for: <strong>{activeYearText}</strong></p>
+           <h1 style={{ fontSize: '2.2rem', fontWeight: 800, background: 'linear-gradient(90deg, var(--primary-default), #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>
+              Institutional Analytics
+           </h1>
+           <p className="text-muted" style={{ marginTop: '0.25rem', fontSize: '1.05rem' }}>Comprehensive Year-Over-Year Academic Insights</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-           <div className="status-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-default)' }}>
-              <TrendingUp size={14} style={{ marginRight: '0.25rem' }} /> Live Analytics
-           </div>
-        </div>
-      </div>
-
-      {/* Aggregate Statistics Overview */}
-      <div className="dashboard-grid" style={{ marginBottom: '2.5rem' }}>
-        {/* FACULTY STATS */}
-        <div className="stat-card" onClick={() => handleCardClick({ qualification: 'All' }, '/faculty')}>
-          <div className="stat-icon-wrapper">
-             <Users size={20} className="stat-icon" />
-          </div>
-          <div className="stat-value">{totalFacultyCount}</div>
-          <div className="stat-label">Total Faculty</div>
-        </div>
-        
-        <div className="stat-card" onClick={() => handleCardClick({ phdStatus: 'Yes' }, '/faculty')}>
-          <div className="stat-icon-wrapper" style={{ backgroundColor: '#e2e8f0', color: '#475569' }}>
-             <Building2 size={20} style={{ color: 'inherit' }} />
-          </div>
-          <div className="stat-value">{phDCount}</div>
-          <div className="stat-label">Ph.D. Holders</div>
-        </div>
-        
-        {/* STUDENT STATS */}
-        <div className="stat-card" onClick={() => handleCardClick({}, '/students')}>
-          <div className="stat-icon-wrapper" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-             <GraduationCap size={20} style={{ color: 'inherit' }} />
-          </div>
-          <div className="stat-value">{totalStudentCount}</div>
-          <div className="stat-label">Total Students Enrolled</div>
-        </div>
-
-        <div className="stat-card" onClick={() => handleCardClick({}, '/students')}>
-          <div className="stat-icon-wrapper" style={{ backgroundColor: '#fdf4ff', color: '#c026d3' }}>
-             <Users size={20} style={{ color: 'inherit' }} />
-          </div>
-          <div className="stat-value">{femaleStudentCount} <span style={{fontSize: '1rem', color: '#94a3b8', opacity: 0.7}}>| {maleStudentCount}</span></div>
-          <div className="stat-label">Female | Male Ratio</div>
+        <div className="status-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-default)', padding: '0.5rem 1rem', borderRadius: '50px', fontWeight: 600, boxShadow: '0 4px 14px 0 rgba(0,118,255,0.15)' }}>
+            <TrendingUp size={16} style={{ marginRight: '0.5rem' }} /> Live Database Sync
         </div>
       </div>
 
-      {/* Analytics Area */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-         
-         {/* YEAR-WISE BARCHART COMPACT */}
-         <div className="card">
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>Multi-Year Institutional Growth</h3>
-            <div style={{ height: '320px', width: '100%' }}>
-              <ResponsiveContainer>
-                <BarChart data={yearWiseData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-                  <Tooltip 
-                     cursor={{ fill: 'var(--bg-surface-hover)' }}
-                     contentStyle={{ backgroundColor: 'var(--bg-surface-glass)', backdropFilter: 'blur(8px)', borderRadius: '8px', border: '1px solid var(--border-color)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="Faculty" fill="var(--primary-default)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                  <Bar dataKey="Students" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-         </div>
+      {/* Massive Year-over-Year Growth Chart */}
+      {yearWiseData.length > 0 && (
+          <div className="card" style={{ padding: '2rem', marginBottom: '3rem', border: 'none', background: 'linear-gradient(145deg, var(--bg-surface), var(--bg-surface-hover))', boxShadow: '0 20px 40px -15px rgba(0,0,0,0.05)' }}>
+             <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                 Evolution Trajectory
+             </h3>
+             <div style={{ height: '350px', width: '100%' }}>
+               <ResponsiveContainer>
+                 <AreaChart data={yearWiseData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                   <defs>
+                     <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
+                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                     </linearGradient>
+                     <linearGradient id="colorFaculty" x1="0" y1="0" x2="0" y2="1">
+                       <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                       <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                     </linearGradient>
+                   </defs>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" opacity={0.5} />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: 'var(--text-muted)', fontWeight: 600 }} dy={10} />
+                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+                   <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-surface-glass)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', padding: '1rem' }}
+                      itemStyle={{ fontWeight: 600 }}
+                   />
+                   <Area type="monotone" dataKey="Students" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorStudents)" />
+                   <Area type="monotone" dataKey="Faculty" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorFaculty)" />
+                 </AreaChart>
+               </ResponsiveContainer>
+             </div>
+          </div>
+      )}
 
-         {/* STUDENT COURSE DISTRIBUTION */}
-         <div className="card">
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-               <Presentation size={18} /> Top Course Enrollments ({activeYearText})
-            </h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-               {topCourses.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>No specific course data available.</div>
-               ) : (
-                  topCourses.map((course, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                       <div style={{ 
-                          width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-surface-hover)', 
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)'
-                       }}>
-                          #{idx + 1}
-                       </div>
-                       <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{course.name}</span>
-                          <div style={{ width: '100%', backgroundColor: 'var(--bg-surface-hover)', height: '6px', borderRadius: '3px', marginTop: '0.5rem' }}>
-                             <div style={{ 
-                                 width: `${Math.min(100, (course.count / totalStudentCount) * 100)}%`, 
-                                 backgroundColor: 'var(--primary-default)', 
-                                 height: '100%', 
-                                 borderRadius: '3px' 
-                             }}></div>
-                          </div>
-                       </div>
-                       <div style={{ fontWeight: 600, width: '40px', textAlign: 'right' }}>{course.count}</div>
-                    </div>
-                  ))
-               )}
-            </div>
-         </div>
-
+      {/* Dynamic Year-Wise Data Blocks */}
+      <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Building2 size={24} color="var(--primary-default)" /> Year-Wise Split Up
+      </h2>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
+          {yearWiseData.map((yearObj, idx) => (
+             <div key={idx} style={{
+                 background: 'var(--bg-surface)',
+                 borderRadius: '20px',
+                 padding: '2rem',
+                 border: '1px solid var(--border-color)',
+                 boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)',
+                 position: 'relative',
+                 overflow: 'hidden',
+                 transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                 cursor: 'pointer'
+             }} 
+             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 20px 40px -10px rgba(0,0,0,0.12)'; }}
+             onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 30px -10px rgba(0,0,0,0.08)'; }}
+             onClick={() => handleCardClick('/faculty', yearObj.name)}
+             >
+                 {/* Decorative background circle */}
+                 <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '150px', height: '150px', background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(236,72,153,0.1))', borderRadius: '50%', filter: 'blur(20px)', zIndex: 0 }}></div>
+                 
+                 <div style={{ position: 'relative', zIndex: 1 }}>
+                     <h3 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '1.5rem', color: 'var(--primary-text)' }}>
+                        {yearObj.name}
+                     </h3>
+                     
+                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px dashed var(--border-color)' }}>
+                         <div>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Faculty</p>
+                            <p style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary-default)' }}>{yearObj.Faculty}</p>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{Math.round((yearObj.PhD / (yearObj.Faculty || 1))*100)}% Ph.D.</p>
+                         </div>
+                         <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Students</p>
+                            <p style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ec4899' }}>{yearObj.Students}</p>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                               <span style={{ color: '#0ea5e9', fontWeight: 600 }}>{yearObj.Male} M</span>
+                               <span>|</span>
+                               <span style={{ color: '#ec4899', fontWeight: 600 }}>{yearObj.Female} F</span>
+                            </div>
+                         </div>
+                     </div>
+                     
+                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--primary-default)', fontWeight: 600, fontSize: '0.9rem' }}>
+                         Explore Database <ArrowRight size={16} />
+                     </div>
+                 </div>
+             </div>
+          ))}
       </div>
+
     </div>
   );
 }
