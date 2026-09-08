@@ -12,6 +12,7 @@ export const useData = () => useContext(DataContext);
 export const DataProvider = ({ children }) => {
   const { currentUser } = useAuth();
   
+  const [isSyncing, setIsSyncing] = useState(false);
   const [facultyData, setFacultyData] = useState([]);
   const [studentData, setStudentData] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -94,8 +95,7 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
     const currentFileName = file.name;
     const timestamp = new Date().toLocaleString();
     
-    setFileName(currentFileName);
-    setLastUpdated(timestamp);
+    setIsSyncing(true);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -106,87 +106,63 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
         let finalCategories = categories;
         
         if (targetDataset.type === 'student') {
-             // For students
              const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
              let targetSheet = wb.SheetNames[0];
              const ws = wb.Sheets[targetSheet];
              let rawStudents = XLSX.utils.sheet_to_json(ws);
              
-             // Tag it with academic year
              const stampedData = rawStudents.map(s => ({ ...s, academicYear: targetDataset.year }));
              countProcessed = stampedData.length;
              
+             // Await chunk push strictly BEFORE updating state
+             const qs = await getDocs(collection(db, 'studentData'));
+             for (const d of qs.docs) {
+                 if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
+             }
+             for (let i = 0; i < stampedData.length; i += 1000) {
+                 const chunk = stampedData.slice(i, i + 1000);
+                 await setDoc(doc(db, 'studentData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
+             }
+
              setStudentData(prev => {
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
-                 const finalData = [...filteredPrev, ...stampedData];
-                 return finalData;
+                 return [...filteredPrev, ...stampedData];
              });
-             
-             // Chunk pushing architecture to bypass 1MB max document limit
-             (async () => {
-                 try {
-                     const qs = await getDocs(collection(db, 'studentData'));
-                     for (const d of qs.docs) {
-                         if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
-                     }
-                     for (let i = 0; i < stampedData.length; i += 1000) {
-                         const chunk = stampedData.slice(i, i + 1000);
-                         await setDoc(doc(db, 'studentData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
-                     }
-                 } catch(err) {
-                     console.error("Firestore push failed:", err);
-                 }
-             })();
 
         } else {
-             // It's a faculty upload
              const { data: processedData, categories: extractedCat, dataQuality: quality } = parseExcelData(buffer);
              
-             // Stamp with academic year based on selection
              const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset.year }));
              countProcessed = stampedData.length;
              finalQuality = quality;
+             
+             // Await chunk push strictly BEFORE updating state
+             const qs = await getDocs(collection(db, 'facultyData'));
+             for (const d of qs.docs) {
+                 if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
+             }
+             for (let i = 0; i < stampedData.length; i += 1000) {
+                 const chunk = stampedData.slice(i, i + 1000);
+                 await setDoc(doc(db, 'facultyData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
+             }
              
              setCategories(prev => {
                 let allCaps = new Set([...prev, ...extractedCat]);
                 finalCategories = Array.from(allCaps);
                 return finalCategories;
              });
-             
              setDataQuality(quality);
-             
              setFacultyData(prev => {
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
-                 const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
-                 return merged;
+                 return [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
              });
-             
-             // Chunk pushing architecture to bypass 1MB max document limit
-             (async () => {
-                 try {
-                     const qs = await getDocs(collection(db, 'facultyData'));
-                     for (const d of qs.docs) {
-                         if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
-                     }
-                     for (let i = 0; i < stampedData.length; i += 1000) {
-                         const chunk = stampedData.slice(i, i + 1000);
-                         await setDoc(doc(db, 'facultyData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
-                     }
-                 } catch(err) {
-                     console.error("Firestore push failed:", err);
-                 }
-             })();
         }
         
-        // Push successful history log & sync complete meta to Firestore
-        const uHistObj = {
-            id: Date.now(),
-            filename: currentFileName,
-            time: timestamp,
-            type: targetDataset.type,
-            year: targetDataset.year,
-            count: countProcessed
-        };
+        setFileName(currentFileName);
+        setLastUpdated(timestamp);
+        
+        const uHistObj = { id: Date.now(), filename: currentFileName, time: timestamp, type: targetDataset.type, year: targetDataset.year, count: countProcessed };
+
         
         setUploadHistory(prev => {
             const nextHistory = [uHistObj, ...prev];
@@ -206,6 +182,8 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
       } catch (err) {
         console.error('Error parsing excel:', err);
         alert('Failed to parse Excel file. Ensure it matches the expected structure.');
+      } finally {
+        setIsSyncing(false);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -302,7 +280,8 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
     getFilteredData,
     getUniqueValues,
     uploadHistory,
-    isInitializing
+    isInitializing,
+    isSyncing
   };
 
   if (isInitializing) return null;

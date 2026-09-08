@@ -30,7 +30,7 @@ function AppRouter() {
 }
 
 function AppLayout() {
-  const { handleFileUpload, lastUpdated, fileName, facultyData, studentData } = useData();
+  const { handleFileUpload, lastUpdated, fileName, facultyData, studentData, isSyncing } = useData();
   const { logout, isAdmin } = useAuth();
   const location = useLocation();
   const [theme, setTheme] = useState('light');
@@ -98,43 +98,53 @@ function AppLayout() {
       {showUploadDialog && (
          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="card animate-fade-in" style={{ width: '400px', backgroundColor: 'var(--bg-surface)' }}>
-               <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-title)', marginBottom: '1.5rem' }}>Inject Database Chunk</h2>
-               
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                   <div>
-                       <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Schema</label>
-                       <select 
-                           value={uploadSelection.type} 
-                           onChange={(e) => setUploadSelection(s => ({...s, type: e.target.value}))}
-                           style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
-                       >
-                           <option value="faculty">Faculty Registry Arrays</option>
-                           <option value="student">Student Demographic Arrays</option>
-                       </select>
+               {isSyncing ? (
+                   <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                       <Upload size={48} color="var(--primary-default)" style={{ animation: 'bounce 2s infinite', marginBottom: '1rem' }} />
+                       <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-title)', marginBottom: '0.5rem' }}>Syncing to Cloud...</h2>
+                       <p style={{ color: 'var(--text-muted)' }}>Securely breaking and transmitting data chunks. Please do not refresh the page.</p>
                    </div>
-                   <div>
-                       <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Academic Year</label>
-                       <select 
-                           value={uploadSelection.year} 
-                           onChange={(e) => setUploadSelection(s => ({...s, year: e.target.value}))}
-                           style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
-                       >
-                           <option value="2026-2027">2026-2027</option>
-                           <option value="2025-2026">2025-2026</option>
-                           <option value="2024-2025">2024-2025</option>
-                           <option value="2023-2024">2023-2024</option>
-                       </select>
-                   </div>
-               </div>
+               ) : (
+                   <>
+                       <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-title)', marginBottom: '1.5rem' }}>Inject Database Chunk</h2>
+                       
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                           <div>
+                               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Schema</label>
+                               <select 
+                                   value={uploadSelection.type} 
+                                   onChange={(e) => setUploadSelection(s => ({...s, type: e.target.value}))}
+                                   style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
+                               >
+                                   <option value="faculty">Faculty Registry Arrays</option>
+                                   <option value="student">Student Demographic Arrays</option>
+                               </select>
+                           </div>
+                           <div>
+                               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Academic Year</label>
+                               <select 
+                                   value={uploadSelection.year} 
+                                   onChange={(e) => setUploadSelection(s => ({...s, year: e.target.value}))}
+                                   style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
+                               >
+                                   <option value="2026-2027">2026-2027</option>
+                                   <option value="2025-2026">2025-2026</option>
+                                   <option value="2024-2025">2024-2025</option>
+                                   <option value="2023-2024">2023-2024</option>
+                               </select>
+                           </div>
+                       </div>
 
-               <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button onClick={() => setShowUploadDialog(false)} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--bg-surface-hover)', cursor: 'pointer', fontWeight: 600, color: 'var(--text-muted)' }}>
-                     Cancel
-                  </button>
-                  <button onClick={() => { setShowUploadDialog(false); document.getElementById('file-upload-global').click(); }} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--primary-solid)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-                     Browse Excel...
-                  </button>
-               </div>
+                       <div style={{ display: 'flex', gap: '1rem' }}>
+                          <button onClick={() => setShowUploadDialog(false)} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--bg-surface-hover)', cursor: 'pointer', fontWeight: 600, color: 'var(--text-muted)' }}>
+                             Cancel
+                          </button>
+                          <button onClick={() => { document.getElementById('file-upload-global').click(); }} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--primary-solid)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                             Browse Excel...
+                          </button>
+                       </div>
+                   </>
+               )}
             </div>
          </div>
       )}

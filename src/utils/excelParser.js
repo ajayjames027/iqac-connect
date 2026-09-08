@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 
 // Standardized mapping of core demographic fields to expected variations in Excel
 export const CORE_FIELDS = {
-  id: ['S.No', 'SNo', 'Serial No', 'ID', 'Emp ID'],
+  id: ['S.No', 'SNo', 'Serial No', 'Emp ID', 'Employee ID'],
   name: ['Name of the Teaching Staff', 'Name Of The Employee', 'Faculty Name', 'Name of Faculty', 'Staff Name'],
   department: ['Department', 'Dept'],
   facultyType: ['Aided/Coordinator/Secretary', 'Nature Of Appointment', 'Faculty Type'],
