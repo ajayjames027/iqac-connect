@@ -9,8 +9,17 @@ export default function StudentsList() {
    const [gender, setGender] = useState('All');
    const [course, setCourse] = useState('All');
    
+   const normalizedStudentData = useMemo(() => {
+       return studentData.map(s => {
+           let gen = s.GENDER || '';
+           if (gen.toLowerCase() === 'female') gen = 'Female';
+           else if (gen.toLowerCase() === 'male') gen = 'Male';
+           return { ...s, normalizedGender: gen };
+       });
+   }, [studentData]);
+
    const filteredData = useMemo(() => {
-       return studentData.filter(student => {
+       return normalizedStudentData.filter(student => {
            // Search Filter
            if (search) {
                const searchLower = search.toLowerCase();
@@ -20,24 +29,24 @@ export default function StudentsList() {
            }
            
            // Gender Filter
-           if (gender !== 'All' && student.GENDER !== gender) return false;
+           if (gender !== 'All' && student.normalizedGender !== gender) return false;
            
            // Course Filter
            if (course !== 'All' && student.CourseName !== course) return false;
            
            return true;
        });
-   }, [studentData, search, gender, course]);
+   }, [normalizedStudentData, search, gender, course]);
    
    const courses = useMemo(() => {
-       const vals = studentData.map(s => s.CourseName).filter(Boolean);
+       const vals = normalizedStudentData.map(s => s.CourseName).filter(Boolean);
        return ['All', ...new Set(vals)].sort();
-   }, [studentData]);
+   }, [normalizedStudentData]);
    
    const genders = useMemo(() => {
-       const vals = studentData.map(s => s.GENDER).filter(Boolean);
+       const vals = normalizedStudentData.map(s => s.normalizedGender).filter(Boolean);
        return ['All', ...new Set(vals)].sort();
-   }, [studentData]);
+   }, [normalizedStudentData]);
 
    const handleExport = () => {
         if (!filteredData.length) return;
@@ -47,7 +56,7 @@ export default function StudentsList() {
             s['D.No.'] || s.SNo || '',
             s.NAME || '',
             s.CourseName || '',
-            s.GENDER || '',
+            s.normalizedGender || '',
             s.STATE || '',
             s.COMMUNITY || '',
             s.RELIGION || ''
@@ -83,7 +92,7 @@ export default function StudentsList() {
        <div className="animate-fade-in">
            <div className="flex justify-between items-center" style={{ marginBottom: '2rem' }}>
                <h1 className="text-h1">Student Directory</h1>
-               <div className="status-badge status-yes">Total {studentData.length} Students Loaded</div>
+               <div className="status-badge status-yes">Showing {filteredData.length} of {studentData.length} Loaded</div>
            </div>
            
            <div className="card" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
@@ -138,7 +147,7 @@ export default function StudentsList() {
                            <td style={{ fontWeight: 600 }}>{student['D.No.'] || student.SNo || '-'}</td>
                            <td style={{ fontWeight: 600, color: 'var(--primary-text)' }}>{student.NAME}</td>
                            <td>{student.CourseName}</td>
-                           <td>{student.GENDER}</td>
+                           <td>{student.normalizedGender}</td>
                            <td>{student.STATE}</td>
                            <td>{student.COMMUNITY}</td>
                            <td>{student.RELIGION}</td>
