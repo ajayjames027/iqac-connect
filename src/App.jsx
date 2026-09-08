@@ -144,16 +144,59 @@ function AppLayout() {
 
 function StudentsList() {
    const { studentData } = useData();
+   
+   if (!studentData || studentData.length === 0) {
+      return (
+         <div className="animate-fade-in" style={{ padding: '2rem', textAlign: 'center' }}>
+             <h1 className="text-h1" style={{ marginBottom: '1rem' }}>Student Database</h1>
+             <div className="card" style={{ opacity: 0.7 }}>
+                 <p>No Student Data loaded. Please select <strong>"Student Details Database"</strong> in the sidebar and upload the file.</p>
+             </div>
+         </div>
+      );
+   }
+
    return (
        <div className="animate-fade-in">
-           <h1 className="text-h1" style={{ marginBottom: '1rem' }}>Student Database</h1>
-           <div className="card">
-               {studentData.length > 0 ? (
-                  <p>Loaded {studentData.length} records. Ready to map student visual architecture!</p>
-               ) : (
-                  <p>No Student Data loaded. Please select "Student Details Database" in the sidebar and upload.</p>
-               )}
+           <div className="flex justify-between items-center" style={{ marginBottom: '2rem' }}>
+               <h1 className="text-h1">Student Directory</h1>
+               <div className="status-badge status-yes">{studentData.length} Students Loaded</div>
            </div>
+           
+           <div className="table-container">
+               <table className="data-table">
+                  <thead>
+                     <tr>
+                        <th>Admission No</th>
+                        <th>Name</th>
+                        <th>Course</th>
+                        <th>Gender</th>
+                        <th>State</th>
+                        <th>Community</th>
+                        <th>Religion</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     {studentData.slice(0, 100).map((student, idx) => (
+                        <tr key={idx}>
+                           <td style={{ fontWeight: 600 }}>{student['D.No.'] || student.SNo || '-'}</td>
+                           <td style={{ fontWeight: 600, color: 'var(--primary-text)' }}>{student.NAME}</td>
+                           <td>{student.CourseName}</td>
+                           <td>{student.GENDER}</td>
+                           <td>{student.STATE}</td>
+                           <td>{student.COMMUNITY}</td>
+                           <td>{student.RELIGION}</td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+           </div>
+           
+           {studentData.length > 100 && (
+              <div style={{ textAlign: 'center', margin: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Showing top 100 student records out of {studentData.length}.
+              </div>
+           )}
        </div>
    );
 }

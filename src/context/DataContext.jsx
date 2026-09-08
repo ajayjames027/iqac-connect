@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { parseExcelData } from '../utils/excelParser';
 import * as XLSX from 'xlsx';
+import localforage from 'localforage';
 
 const DataContext = createContext();
 
@@ -26,6 +27,46 @@ export const DataProvider = ({ children }) => {
     phdGuide: 'All',
     shift: 'All'
   });
+
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    // Load persisted data on mount
+    const loadPersistedData = async () => {
+       try {
+           const fData = await localforage.getItem('iqac_facultyData') || [];
+           const sData = await localforage.getItem('iqac_studentData') || [];
+           const cats = await localforage.getItem('iqac_categories') || [];
+           const cName = await localforage.getItem('iqac_fileName') || '';
+           const cDate = await localforage.getItem('iqac_lastUpdated') || '';
+           const cQual = await localforage.getItem('iqac_dataQuality') || null;
+           
+           if (fData.length || sData.length) {
+               setFacultyData(fData);
+               setStudentData(sData);
+               setCategories(cats);
+               setFileName(cName);
+               setLastUpdated(cDate);
+               setDataQuality(cQual);
+           }
+       } catch(e) {
+           console.error("LocalForage load error:", e);
+       }
+       setIsInitializing(false);
+    };
+    loadPersistedData();
+  }, []);
+
+  // Save changes to localForage automatically
+  useEffect(() => {
+    if (isInitializing) return;
+    localforage.setItem('iqac_facultyData', facultyData);
+    localforage.setItem('iqac_studentData', studentData);
+    localforage.setItem('iqac_categories', categories);
+    localforage.setItem('iqac_fileName', fileName);
+    localforage.setItem('iqac_lastUpdated', lastUpdated);
+    localforage.setItem('iqac_dataQuality', dataQuality);
+  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, isInitializing]);
 
   const handleFileUpload = (e, targetDataset = '2026-2027') => {
     const file = e.target.files[0];
@@ -163,8 +204,11 @@ export const DataProvider = ({ children }) => {
     setFilters,
     handleFileUpload,
     getFilteredData,
-    getUniqueValues
+    getUniqueValues,
+    isInitializing
   };
+
+  if (isInitializing) return null;
 
   return (
     <DataContext.Provider value={value}>

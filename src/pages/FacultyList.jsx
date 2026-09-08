@@ -97,6 +97,13 @@ export default function FacultyList() {
          </div>
 
          <div className="input-group" style={{ flex: '1 1 150px' }}>
+            <label className="input-label">Academic Year</label>
+            <select className="input-field" value={filters.academicYear} onChange={(e) => handleFilterChange('academicYear', e.target.value)}>
+               {getUniqueValues('academicYear').map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+         </div>
+
+         <div className="input-group" style={{ flex: '1 1 150px' }}>
             <label className="input-label">Department</label>
             <select className="input-field" value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
                {departments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -166,6 +173,7 @@ export default function FacultyList() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Academic Year</th>
               <th>Department</th>
               <th>Designation</th>
               <th>Type</th>
@@ -178,6 +186,11 @@ export default function FacultyList() {
                 <tr key={faculty.id}>
                   <td style={{ fontWeight: 500, color: 'var(--primary-text)', cursor: 'pointer' }} onClick={() => setSelectedFaculty(faculty)}>
                      {faculty.name}
+                  </td>
+                  <td>
+                    <span className="badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-text)' }}>
+                      {faculty.academicYear}
+                    </span>
                   </td>
                   <td>{faculty.department}</td>
                   <td>{faculty.designation}</td>

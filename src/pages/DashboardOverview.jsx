@@ -82,9 +82,25 @@ export default function DashboardOverview() {
     { title: 'Shift II', value: shift2Count, icon: Moon, filter: { shift: 'II' } }
   ];
 
+  let activeYearText = "All Years";
+  if (filters.academicYear && filters.academicYear !== 'All') {
+     activeYearText = filters.academicYear;
+  }
+
   return (
     <div className="animate-fade-in">
-      <h1 className="text-h1" style={{ marginBottom: '2rem' }}>Institutional Dashboard</h1>
+      <div className="flex justify-between items-center" style={{ marginBottom: '2rem' }}>
+        <div>
+           <h1 className="text-h1">Faculty Insights</h1>
+           <p className="text-sm text-muted">Currently viewing statistics for: <strong>{activeYearText}</strong></p>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+           <div className="status-badge status-yes">Total {totalFaculty} Faculty</div>
+           <div className="status-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-text)' }}>
+              {activeYearText}
+           </div>
+        </div>
+      </div>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
          {mainCards.map((card, i) => (
