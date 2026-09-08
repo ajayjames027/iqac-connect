@@ -5,8 +5,6 @@ import { DataProvider, useData } from './context/DataContext';
 
 // Pages
 import DashboardOverview from './pages/DashboardOverview';
-import CategoryDashboard from './pages/CategoryDashboard';
-import CategoryDetail from './pages/CategoryDetail';
 import UploadHistory from './pages/UploadHistory';
 import FacultyList from './pages/FacultyList';
 import StudentsList from './pages/StudentsList';
@@ -48,8 +46,7 @@ function AppLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Faculty Registry', path: '/faculty', icon: Users },
-    { name: 'Categories Compliance', path: '/categories', icon: FolderOpen },
-    { name: 'Student Data', path: '/students', icon: Users }
+    { name: 'Student Data', path: '/students', icon: BookOpen }
   ];
   
   if (isAdmin) {
@@ -165,9 +162,6 @@ function AppLayout() {
              <Routes>
                 <Route path="/" element={<DashboardOverview />} />
                 <Route path="/faculty" element={<FacultyList />} />
-                <Route path="/categories" element={<CategoryDashboard />} />
-                <Route path="/categories/:id" element={<CategoryDetail />} />
-                <Route path="/quality" element={<UploadHistory />} />
                 <Route path="/history" element={<UploadHistory />} />
                 <Route path="/students" element={<StudentsList />} />
              </Routes>
