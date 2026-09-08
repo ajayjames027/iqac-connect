@@ -35,6 +35,9 @@ function AppLayout() {
   const location = useLocation();
   const [theme, setTheme] = useState('light');
   
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadSelection, setUploadSelection] = useState({ type: 'faculty', year: '2026-2027' });
+  
   const hasData = facultyData.length > 0 || studentData.length > 0;
 
   useEffect(() => {
@@ -75,7 +78,7 @@ function AppLayout() {
             </Link>
           ))}
           {isAdmin && (
-               <button className="nav-item" onClick={() => document.getElementById('file-upload-global').click()} title="Upload Dataset" style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', marginTop: 'auto' }}>
+               <button className="nav-item" onClick={() => setShowUploadDialog(true)} title="Upload Dataset" style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', marginTop: 'auto' }}>
                   <Upload size={22} />
                </button>
           )}
@@ -91,19 +94,58 @@ function AppLayout() {
         </div>
       </aside>
 
-      {/* Hidden Upload Controller */}
+      {/* Interactive Upload Modal */}
+      {showUploadDialog && (
+         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="card animate-fade-in" style={{ width: '400px', backgroundColor: 'var(--bg-surface)' }}>
+               <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-title)', marginBottom: '1.5rem' }}>Inject Database Chunk</h2>
+               
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                   <div>
+                       <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Schema</label>
+                       <select 
+                           value={uploadSelection.type} 
+                           onChange={(e) => setUploadSelection(s => ({...s, type: e.target.value}))}
+                           style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
+                       >
+                           <option value="faculty">Faculty Registry Arrays</option>
+                           <option value="student">Student Demographic Arrays</option>
+                       </select>
+                   </div>
+                   <div>
+                       <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Target Academic Year</label>
+                       <select 
+                           value={uploadSelection.year} 
+                           onChange={(e) => setUploadSelection(s => ({...s, year: e.target.value}))}
+                           style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-surface-hover)' }}
+                       >
+                           <option value="2026-2027">2026-2027</option>
+                           <option value="2025-2026">2025-2026</option>
+                           <option value="2024-2025">2024-2025</option>
+                           <option value="2023-2024">2023-2024</option>
+                       </select>
+                   </div>
+               </div>
+
+               <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button onClick={() => setShowUploadDialog(false)} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--bg-surface-hover)', cursor: 'pointer', fontWeight: 600, color: 'var(--text-muted)' }}>
+                     Cancel
+                  </button>
+                  <button onClick={() => { setShowUploadDialog(false); document.getElementById('file-upload-global').click(); }} style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', background: 'var(--primary-solid)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                     Browse Excel...
+                  </button>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* Hidden File Input */}
       <input
          type="file"
          id="file-upload-global"
          accept=".xlsx, .xls"
          style={{ display: 'none' }}
-         onChange={(e) => {
-             const t = window.prompt("Type 'student' or 'faculty' for the data target:");
-             if (t !== 'student' && t !== 'faculty') return alert("Invalid target");
-             const y = window.prompt("Type academic year chunk (e.g. 2026-2027):");
-             if (!y) return alert("Invalid year");
-             handleFileUpload(e, { type: t, year: y });
-         }}
+         onChange={(e) => handleFileUpload(e, uploadSelection)}
       />
 
       {/* Main Content Area */}

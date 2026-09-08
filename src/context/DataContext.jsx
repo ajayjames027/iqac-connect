@@ -233,7 +233,10 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
       // PhD Status
       const activePhd = additionalFilters.phdStatus || filters.phdStatus;
       if (activePhd && activePhd !== 'All') {
-          const isPhd = faculty.phdStatus?.toLowerCase().includes('yes');
+          const qual = faculty.qualification?.toLowerCase() || '';
+          const pForm = faculty.phdStatus?.toLowerCase() || '';
+          const isPhd = pForm.includes('yes') || qual.includes('ph.d') || qual.includes('phd');
+          
           if (activePhd === 'Yes' && !isPhd) return false;
           if (activePhd === 'No' && isPhd) return false;
       }
