@@ -32,13 +32,16 @@ export class ErrorBoundary extends React.Component {
           </pre>
           <button 
              onClick={async () => {
-                 const localforage = await import('localforage');
-                 await localforage.default.clear();
+                 try {
+                     const { getAuth, signOut } = await import('firebase/auth');
+                     const auth = getAuth();
+                     await signOut(auth);
+                 } catch(e) {}
                  window.location.reload();
              }}
              style={{ padding: '0.5rem 1rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '1rem' }}
           >
-            Clear Offline Database & Hard Reset
+            Clear Cache & Sign Out
           </button>
         </div>
       );

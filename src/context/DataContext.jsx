@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { parseExcelData } from '../utils/excelParser';
 import * as XLSX from 'xlsx';
-import localforage from 'localforage';
+import { db } from '../firebase';
+import { doc, getDocs, getDoc, setDoc, collection } from 'firebase/firestore';
 
 const DataContext = createContext();
 
@@ -33,19 +34,35 @@ export const DataProvider = ({ children }) => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // Load persisted data on mount
+    // Load persisted data on mount from Firestore Live Database
     const loadPersistedData = async () => {
        try {
-           const fData = await localforage.getItem('iqac_facultyData') || [];
-           const sData = await localforage.getItem('iqac_studentData') || [];
-           const cats = await localforage.getItem('iqac_categories') || [];
-           const cName = await localforage.getItem('iqac_fileName') || '';
-           const cDate = await localforage.getItem('iqac_lastUpdated') || '';
-           const cQual = await localforage.getItem('iqac_dataQuality') || null;
-           const uHist = await localforage.getItem('iqac_uploadHistory') || [];
+           const metaDoc = await getDoc(doc(db, 'iqac', 'meta'));
+           let cName = ''; let cDate = ''; let cQual = null; let cats = []; let uHist = [];
+           
+           if (metaDoc.exists()) {
+               const metaData = metaDoc.data();
+               cName = metaData.fileName || '';
+               cDate = metaData.lastUpdated || '';
+               cQual = metaData.dataQuality || null;
+               cats = metaData.categories ? JSON.parse(metaData.categories) : [];
+               uHist = metaData.uploadHistory ? JSON.parse(metaData.uploadHistory) : [];
+           }
+
+           const fSnapshot = await getDocs(collection(db, 'facultyData'));
+           let fData = [];
+           fSnapshot.forEach(docSnap => {
+               if (docSnap.data().data) fData.push(...JSON.parse(docSnap.data().data));
+           });
+
+           const sSnapshot = await getDocs(collection(db, 'studentData'));
+           let sData = [];
+           sSnapshot.forEach(docSnap => {
+               if (docSnap.data().data) sData.push(...JSON.parse(docSnap.data().data));
+           });
            
         // DB load success
-        if (fData.length || sData.length) {
+        if (fData.length > 0 || sData.length > 0) {
             setFacultyData(fData);
             setStudentData(sData);
             setCategories(cats);
@@ -55,7 +72,7 @@ export const DataProvider = ({ children }) => {
             setUploadHistory(uHist);
         }
     } catch(e) {
-        console.error("LocalForage load error:", e);
+        console.error("Firestore load error:", e);
     }
     hasLoadedFromDB.current = true;
     setIsInitializing(false);
@@ -71,16 +88,15 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
     const timestamp = new Date().toLocaleString();
     
     setFileName(currentFileName);
-    localforage.setItem('iqac_fileName', currentFileName);
-    
     setLastUpdated(timestamp);
-    localforage.setItem('iqac_lastUpdated', timestamp);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const buffer = evt.target.result;
         let countProcessed = 0;
+        let finalQuality = null;
+        let finalCategories = categories;
         
         if (targetDataset.type === 'student') {
              // For students
@@ -96,9 +112,14 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
              setStudentData(prev => {
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
                  const finalData = [...filteredPrev, ...stampedData];
-                 localforage.setItem('iqac_studentData', finalData);
                  return finalData;
              });
+             
+             // Fire background Cloud Push
+             const chunkJson = JSON.stringify(stampedData);
+             setDoc(doc(db, 'studentData', targetDataset.year), { data: chunkJson })
+                  .catch(err => console.error("Firestore push failed:", err));
+
         } else {
              // It's a faculty upload
              const { data: processedData, categories: extractedCat, dataQuality: quality } = parseExcelData(buffer);
@@ -106,26 +127,29 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
              // Stamp with academic year based on selection
              const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset.year }));
              countProcessed = stampedData.length;
+             finalQuality = quality;
              
              setCategories(prev => {
                 let allCaps = new Set([...prev, ...extractedCat]);
-                let finalCats = Array.from(allCaps);
-                localforage.setItem('iqac_categories', finalCats);
-                return finalCats;
+                finalCategories = Array.from(allCaps);
+                return finalCategories;
              });
              
              setDataQuality(quality);
-             localforage.setItem('iqac_dataQuality', quality);
              
              setFacultyData(prev => {
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
                  const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
-                 localforage.setItem('iqac_facultyData', merged);
                  return merged;
              });
+             
+             // Fire background Cloud Push
+             const chunkJson = JSON.stringify(stampedData);
+             setDoc(doc(db, 'facultyData', targetDataset.year), { data: chunkJson })
+                  .catch(err => console.error("Firestore push failed:", err));
         }
         
-        // Push successful history log
+        // Push successful history log & sync complete meta to Firestore
         const uHistObj = {
             id: Date.now(),
             filename: currentFileName,
@@ -137,7 +161,16 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
         
         setUploadHistory(prev => {
             const nextHistory = [uHistObj, ...prev];
-            localforage.setItem('iqac_uploadHistory', nextHistory);
+            
+            // Sync Meta to Firestore
+            setDoc(doc(db, 'iqac', 'meta'), {
+               fileName: currentFileName,
+               lastUpdated: timestamp,
+               dataQuality: finalQuality,
+               categories: JSON.stringify(finalCategories),
+               uploadHistory: JSON.stringify(nextHistory)
+            }, { merge: true }).catch(err => console.error("Firestore meta push failed:", err));
+            
             return nextHistory;
         });
 
