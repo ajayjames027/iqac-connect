@@ -44,47 +44,37 @@ export const DataProvider = ({ children }) => {
            const cQual = await localforage.getItem('iqac_dataQuality') || null;
            const uHist = await localforage.getItem('iqac_uploadHistory') || [];
            
-           if (fData.length || sData.length) {
-               setFacultyData(fData);
-               setStudentData(sData);
-               setCategories(cats);
-               setFileName(cName);
-               setLastUpdated(cDate);
-               setDataQuality(cQual);
-               setUploadHistory(uHist);
-           }
-       } catch(e) {
-           console.error("LocalForage load error:", e);
-       }
-       hasLoadedFromDB.current = true;
-       setIsInitializing(false);
-    };
-    loadPersistedData();
-  }, []);
-
-  const syncDatabase = (fD, sD, c, fN, lU, dQ, uH) => {
-    localforage.setItem('iqac_facultyData', fD);
-    localforage.setItem('iqac_studentData', sD);
-    localforage.setItem('iqac_categories', c);
-    localforage.setItem('iqac_fileName', fN);
-    localforage.setItem('iqac_lastUpdated', lU);
-    localforage.setItem('iqac_dataQuality', dQ);
-    localforage.setItem('iqac_uploadHistory', uH);
+        // DB load success
+        if (fData.length || sData.length) {
+            setFacultyData(fData);
+            setStudentData(sData);
+            setCategories(cats);
+            setFileName(cName);
+            setLastUpdated(cDate);
+            setDataQuality(cQual);
+            setUploadHistory(uHist);
+        }
+    } catch(e) {
+        console.error("LocalForage load error:", e);
+    }
+    hasLoadedFromDB.current = true;
+    setIsInitializing(false);
   };
-  
-  useEffect(() => {
-    if (!hasLoadedFromDB.current) return;
-    syncDatabase(facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory);
-  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory]);
+  loadPersistedData();
+}, []);
 
-  const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027' }) => {
+const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027' }) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const currentFileName = file.name;
     const timestamp = new Date().toLocaleString();
+    
     setFileName(currentFileName);
+    localforage.setItem('iqac_fileName', currentFileName);
+    
     setLastUpdated(timestamp);
+    localforage.setItem('iqac_lastUpdated', timestamp);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -105,7 +95,9 @@ export const DataProvider = ({ children }) => {
              
              setStudentData(prev => {
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
-                 return [...filteredPrev, ...stampedData];
+                 const finalData = [...filteredPrev, ...stampedData];
+                 localforage.setItem('iqac_studentData', finalData);
+                 return finalData;
              });
         } else {
              // It's a faculty upload
@@ -117,16 +109,18 @@ export const DataProvider = ({ children }) => {
              
              setCategories(prev => {
                 let allCaps = new Set([...prev, ...extractedCat]);
-                return Array.from(allCaps);
+                let finalCats = Array.from(allCaps);
+                localforage.setItem('iqac_categories', finalCats);
+                return finalCats;
              });
              
              setDataQuality(quality);
+             localforage.setItem('iqac_dataQuality', quality);
              
              setFacultyData(prev => {
-                 // Remove any old rows that had this same academic year so we can safely "Update"
                  const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
-                 // Re-index safe IDs
                  const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
+                 localforage.setItem('iqac_facultyData', merged);
                  return merged;
              });
         }
@@ -143,6 +137,7 @@ export const DataProvider = ({ children }) => {
         
         setUploadHistory(prev => {
             const nextHistory = [uHistObj, ...prev];
+            localforage.setItem('iqac_uploadHistory', nextHistory);
             return nextHistory;
         });
 
