@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { parseExcelData } from '../utils/excelParser';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase';
-import { doc, getDocs, getDoc, setDoc, collection } from 'firebase/firestore';
+import { doc, getDocs, getDoc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 const DataContext = createContext();
@@ -122,10 +122,21 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
                  return finalData;
              });
              
-             // Fire background Cloud Push
-             const chunkJson = JSON.stringify(stampedData);
-             setDoc(doc(db, 'studentData', targetDataset.year), { data: chunkJson })
-                  .catch(err => console.error("Firestore push failed:", err));
+             // Chunk pushing architecture to bypass 1MB max document limit
+             (async () => {
+                 try {
+                     const qs = await getDocs(collection(db, 'studentData'));
+                     for (const d of qs.docs) {
+                         if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
+                     }
+                     for (let i = 0; i < stampedData.length; i += 1000) {
+                         const chunk = stampedData.slice(i, i + 1000);
+                         await setDoc(doc(db, 'studentData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
+                     }
+                 } catch(err) {
+                     console.error("Firestore push failed:", err);
+                 }
+             })();
 
         } else {
              // It's a faculty upload
@@ -150,10 +161,21 @@ const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027
                  return merged;
              });
              
-             // Fire background Cloud Push
-             const chunkJson = JSON.stringify(stampedData);
-             setDoc(doc(db, 'facultyData', targetDataset.year), { data: chunkJson })
-                  .catch(err => console.error("Firestore push failed:", err));
+             // Chunk pushing architecture to bypass 1MB max document limit
+             (async () => {
+                 try {
+                     const qs = await getDocs(collection(db, 'facultyData'));
+                     for (const d of qs.docs) {
+                         if (d.id.startsWith(targetDataset.year)) await deleteDoc(d.ref);
+                     }
+                     for (let i = 0; i < stampedData.length; i += 1000) {
+                         const chunk = stampedData.slice(i, i + 1000);
+                         await setDoc(doc(db, 'facultyData', `${targetDataset.year}_chunk_${i}`), { data: JSON.stringify(chunk) });
+                     }
+                 } catch(err) {
+                     console.error("Firestore push failed:", err);
+                 }
+             })();
         }
         
         // Push successful history log & sync complete meta to Firestore
