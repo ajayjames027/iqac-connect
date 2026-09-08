@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderOpen, AlertOctagon, Upload, Sun, Moon, Search, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, FolderOpen, AlertOctagon, Upload, Sun, Moon, Search, BookOpen, LogOut } from 'lucide-react';
 import { DataProvider, useData } from './context/DataContext';
 
 // Pages
@@ -10,19 +10,30 @@ import CategoryDetail from './pages/CategoryDetail';
 import UploadHistory from './pages/UploadHistory';
 import FacultyList from './pages/FacultyList';
 import StudentsList from './pages/StudentsList';
+import Login from './pages/Login';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 export default function App() {
   return (
-    <DataProvider>
-      <Router>
-        <AppLayout />
-      </Router>
-    </DataProvider>
+    <AuthProvider>
+      <DataProvider>
+        <Router>
+          <AppRouter />
+        </Router>
+      </DataProvider>
+    </AuthProvider>
   );
+}
+
+function AppRouter() {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <Login />;
+  return <AppLayout />;
 }
 
 function AppLayout() {
   const { handleFileUpload, lastUpdated, fileName, facultyData, studentData } = useData();
+  const { currentUser, isAdmin, logout } = useAuth();
   const location = useLocation();
   const [theme, setTheme] = useState('light');
   
@@ -38,9 +49,12 @@ function AppLayout() {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Faculty Registry', path: '/faculty', icon: Users },
     { name: 'Categories Compliance', path: '/categories', icon: FolderOpen },
-    { name: 'Student Data', path: '/students', icon: Users },
-    { name: 'Upload Status', path: '/history', icon: AlertOctagon },
+    { name: 'Student Data', path: '/students', icon: Users }
   ];
+  
+  if (isAdmin) {
+    navItems.push({ name: 'Upload Status', path: '/history', icon: AlertOctagon });
+  }
 
   return (
     <div className="app-container">
@@ -78,40 +92,45 @@ function AppLayout() {
         </nav>
 
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-           <div style={{ padding: '0 0.5rem', marginBottom: '1rem' }}>
-              <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Target Dataset:</label>
-              <select 
-                 className="input-field" 
-                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.35rem 0.5rem', minHeight: 'auto' }}
-                 onChange={(e) => {
-                    const [t, y] = e.target.value.split('|');
-                    window.currentTargetDataset = { type: t, year: y };
-                 }}
-                 defaultValue="faculty|2026-2027"
-              >
-                  <optgroup label="Faculty Arrays">
-                    <option value="faculty|2026-2027">Faculty 2026-2027</option>
-                    <option value="faculty|2025-2026">Faculty 2025-2026</option>
-                    <option value="faculty|2024-2025">Faculty 2024-2025</option>
-                  </optgroup>
-                  <optgroup label="Student Arrays">
-                    <option value="student|2026-2027">Students 2026-2027</option>
-                    <option value="student|2025-2026">Students 2025-2026</option>
-                    <option value="student|2024-2025">Students 2024-2025</option>
-                  </optgroup>
-              </select>
-           </div>
-           
-           <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => document.getElementById('file-upload').click()}>
-             <Upload size={18} /> Upload / Update
-           </button>
-           <input
-             type="file"
-             id="file-upload"
-             accept=".xlsx, .xls"
-             style={{ display: 'none' }}
-             onChange={(e) => handleFileUpload(e, window.currentTargetDataset || { type: 'faculty', year: '2026-2027' })}
-           />{lastUpdated && (
+           {isAdmin && (
+             <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <div className="input-group">
+                  <label className="input-label">Target Dataset:</label>
+                  <select 
+                     className="input-field" 
+                     style={{ width: '100%', fontSize: '0.8rem', padding: '0.35rem 0.5rem', minHeight: 'auto' }}
+                     onChange={(e) => {
+                        const [t, y] = e.target.value.split('|');
+                        window.currentTargetDataset = { type: t, year: y };
+                     }}
+                     defaultValue="faculty|2026-2027"
+                  >
+                      <optgroup label="Faculty Arrays">
+                        <option value="faculty|2026-2027">Faculty 2026-2027</option>
+                        <option value="faculty|2025-2026">Faculty 2025-2026</option>
+                        <option value="faculty|2024-2025">Faculty 2024-2025</option>
+                      </optgroup>
+                      <optgroup label="Student Arrays">
+                        <option value="student|2026-2027">Students 2026-2027</option>
+                        <option value="student|2025-2026">Students 2025-2026</option>
+                        <option value="student|2024-2025">Students 2024-2025</option>
+                      </optgroup>
+                  </select>
+               </div>
+               
+               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }} onClick={() => document.getElementById('file-upload').click()}>
+                 <Upload size={18} /> Upload / Update
+               </button>
+               <input
+                 type="file"
+                 id="file-upload"
+                 accept=".xlsx, .xls"
+                 style={{ display: 'none' }}
+                 onChange={(e) => handleFileUpload(e, window.currentTargetDataset || { type: 'faculty', year: '2026-2027' })}
+               />
+             </div>
+           )}
+           {lastUpdated && (
              <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                <strong>Data Source:</strong> {fileName}<br/>
                <strong>Updated:</strong> {lastUpdated}
@@ -123,9 +142,15 @@ function AppLayout() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header style={{ height: 'var(--header-height)', backgroundColor: 'var(--bg-surface-glass)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 2rem', zIndex: 10 }}>
+        <header style={{ height: 'var(--header-height)', backgroundColor: 'var(--bg-surface-glass)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 2rem', zIndex: 10, gap: '1rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-default)' }}>
+                 {currentUser.email}
+            </span>
             <button onClick={toggleTheme} className="btn btn-outline" style={{ borderRadius: '50%', padding: '0.5rem' }}>
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
+            <button className="btn btn-outline" style={{ border: 'none', padding: '0.5rem' }} onClick={logout} title="Log Out">
+               <LogOut size={20} />
             </button>
         </header>
 
