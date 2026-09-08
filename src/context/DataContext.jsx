@@ -35,24 +35,22 @@ export const DataProvider = ({ children }) => {
     setLastUpdated(new Date().toLocaleString());
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
+        const buffer = evt.target.result;
         
-        let targetSheet = wb.SheetNames[0]; // fallback
         if (targetDataset === 'Students') {
              // For students, just store the first sheet raw for now
+             const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+             let targetSheet = wb.SheetNames[0];
              const ws = wb.Sheets[targetSheet];
              const data = XLSX.utils.sheet_to_json(ws);
              setStudentData(data);
              return;
         }
 
-        // It's a faculty upload
-        const ws = wb.Sheets[targetSheet];
-        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        const { processedData, categories: extractedCat, quality } = parseExcelData(rawData);
+        // It's a faculty upload, pass buffer to parser
+        const { data: processedData, categories: extractedCat, dataQuality: quality } = parseExcelData(buffer);
 
         // Stamp with academic year based on selection
         const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset }));
@@ -76,7 +74,7 @@ export const DataProvider = ({ children }) => {
         alert('Failed to parse Excel file. Ensure it matches the expected structure.');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = ''; // reset
   };
 
