@@ -14,6 +14,7 @@ export const DataProvider = ({ children }) => {
   const [dataQuality, setDataQuality] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fileName, setFileName] = useState('');
+  const [uploadHistory, setUploadHistory] = useState([]);
   
   const [filters, setFilters] = useState({
     search: '',
@@ -40,6 +41,7 @@ export const DataProvider = ({ children }) => {
            const cName = await localforage.getItem('iqac_fileName') || '';
            const cDate = await localforage.getItem('iqac_lastUpdated') || '';
            const cQual = await localforage.getItem('iqac_dataQuality') || null;
+           const uHist = await localforage.getItem('iqac_uploadHistory') || [];
            
            if (fData.length || sData.length) {
                setFacultyData(fData);
@@ -48,6 +50,7 @@ export const DataProvider = ({ children }) => {
                setFileName(cName);
                setLastUpdated(cDate);
                setDataQuality(cQual);
+               setUploadHistory(uHist);
            }
        } catch(e) {
            console.error("LocalForage load error:", e);
@@ -66,50 +69,73 @@ export const DataProvider = ({ children }) => {
     localforage.setItem('iqac_fileName', fileName);
     localforage.setItem('iqac_lastUpdated', lastUpdated);
     localforage.setItem('iqac_dataQuality', dataQuality);
-  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, isInitializing]);
+    localforage.setItem('iqac_uploadHistory', uploadHistory);
+  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory, isInitializing]);
 
-  const handleFileUpload = (e, targetDataset = '2026-2027') => {
+  const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027' }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    setFileName(file.name);
-    setLastUpdated(new Date().toLocaleString());
+    const currentFileName = file.name;
+    const timestamp = new Date().toLocaleString();
+    setFileName(currentFileName);
+    setLastUpdated(timestamp);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const buffer = evt.target.result;
+        let countProcessed = 0;
         
-        if (targetDataset === 'Students') {
-             // For students, just store the first sheet raw for now
+        if (targetDataset.type === 'student') {
+             // For students
              const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
              let targetSheet = wb.SheetNames[0];
              const ws = wb.Sheets[targetSheet];
-             const data = XLSX.utils.sheet_to_json(ws);
-             setStudentData(data);
-             return;
+             let rawStudents = XLSX.utils.sheet_to_json(ws);
+             
+             // Tag it with academic year
+             const stampedData = rawStudents.map(s => ({ ...s, academicYear: targetDataset.year }));
+             countProcessed = stampedData.length;
+             
+             setStudentData(prev => {
+                 const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
+                 return [...filteredPrev, ...stampedData];
+             });
+        } else {
+             // It's a faculty upload
+             const { data: processedData, categories: extractedCat, dataQuality: quality } = parseExcelData(buffer);
+             
+             // Stamp with academic year based on selection
+             const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset.year }));
+             countProcessed = stampedData.length;
+             
+             setCategories(prev => {
+                let allCaps = new Set([...prev, ...extractedCat]);
+                return Array.from(allCaps);
+             });
+             
+             setDataQuality(quality);
+             
+             setFacultyData(prev => {
+                 // Remove any old rows that had this same academic year so we can safely "Update"
+                 const filteredPrev = prev.filter(p => p.academicYear !== targetDataset.year);
+                 // Re-index safe IDs
+                 const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
+                 return merged;
+             });
         }
-
-        // It's a faculty upload, pass buffer to parser
-        const { data: processedData, categories: extractedCat, dataQuality: quality } = parseExcelData(buffer);
-
-        // Stamp with academic year based on selection
-        const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset }));
-
-        setCategories(prev => {
-           let allCaps = new Set([...prev, ...extractedCat]);
-           return Array.from(allCaps);
-        });
         
-        setDataQuality(quality);
+        // Push successful history log
+        setUploadHistory(prev => [{
+            id: Date.now(),
+            filename: currentFileName,
+            time: timestamp,
+            type: targetDataset.type,
+            year: targetDataset.year,
+            count: countProcessed
+        }, ...prev]);
         
-        setFacultyData(prev => {
-            // Remove any old rows that had this same academic year so we can safely "Update"
-            const filteredPrev = prev.filter(p => p.academicYear !== targetDataset);
-            // Re-index safe IDs
-            const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
-            return merged;
-        });
       } catch (err) {
         console.error('Error parsing excel:', err);
         alert('Failed to parse Excel file. Ensure it matches the expected structure.');
@@ -205,6 +231,7 @@ export const DataProvider = ({ children }) => {
     handleFileUpload,
     getFilteredData,
     getUniqueValues,
+    uploadHistory,
     isInitializing
   };
 

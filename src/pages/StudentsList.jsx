@@ -6,6 +6,7 @@ export default function StudentsList() {
    const { studentData } = useData();
    
    const [search, setSearch] = useState('');
+   const [academicYear, setAcademicYear] = useState('All');
    const [gender, setGender] = useState('All');
    const [course, setCourse] = useState('All');
    
@@ -32,6 +33,9 @@ export default function StudentsList() {
                if (!nameMatch && !admissionMatch) return false;
            }
            
+           // Academic Year Filter
+           if (academicYear !== 'All' && student.academicYear !== academicYear) return false;
+           
            // Gender Filter
            if (gender !== 'All' && student.normalizedGender !== gender) return false;
            
@@ -40,7 +44,12 @@ export default function StudentsList() {
            
            return true;
        });
-   }, [normalizedStudentData, search, gender, course]);
+   }, [normalizedStudentData, search, academicYear, gender, course]);
+   
+   const academicYears = useMemo(() => {
+       const vals = normalizedStudentData.map(s => s.academicYear).filter(Boolean);
+       return ['All', ...new Set(vals)].sort();
+   }, [normalizedStudentData]);
    
    const courses = useMemo(() => {
        const vals = normalizedStudentData.map(s => s.CourseName ? s.CourseName.toString() : null).filter(Boolean);
@@ -55,10 +64,11 @@ export default function StudentsList() {
    const handleExport = () => {
         if (!filteredData.length) return;
         
-        const headers = ['Admission No', 'Name', 'Course', 'Gender', 'State', 'Community', 'Religion'];
+        const headers = ['Admission No', 'Name', 'Year', 'Course', 'Gender', 'State', 'Community', 'Religion'];
         const rows = filteredData.map(s => [
             s['D.No.'] || s.SNo || '',
             s.NAME || '',
+            s.academicYear || '',
             s.CourseName || '',
             s.normalizedGender || '',
             s.STATE || '',
@@ -107,6 +117,13 @@ export default function StudentsList() {
                    <input type="text" className="input-field" placeholder="Search..." style={{ paddingLeft: '2.5rem' }} value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
              </div>
+
+             <div className="input-group" style={{ flex: '1 1 150px' }}>
+                <label className="input-label">Academic Year</label>
+                <select className="input-field" value={academicYear} onChange={e => setAcademicYear(e.target.value)}>
+                   {academicYears.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+             </div>
              
              <div className="input-group" style={{ flex: '1 1 150px' }}>
                 <label className="input-label">Course</label>
@@ -123,7 +140,7 @@ export default function StudentsList() {
              </div>
              
              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
-                <button className="btn btn-outline" onClick={() => { setSearch(''); setCourse('All'); setGender('All'); }} title="Reset" style={{ height: '38px' }}>
+                <button className="btn btn-outline" onClick={() => { setSearch(''); setAcademicYear('All'); setCourse('All'); setGender('All'); }} title="Reset" style={{ height: '38px' }}>
                    <RotateCcw size={18} />
                 </button>
                 <button className="btn btn-primary" onClick={handleExport} disabled={filteredData.length === 0} style={{ height: '38px' }}>
@@ -138,6 +155,7 @@ export default function StudentsList() {
                      <tr>
                         <th>Admission No</th>
                         <th>Name</th>
+                        <th>Year</th>
                         <th>Course</th>
                         <th>Gender</th>
                         <th>State</th>
@@ -150,6 +168,11 @@ export default function StudentsList() {
                         <tr key={idx}>
                            <td style={{ fontWeight: 600 }}>{student['D.No.'] || student.SNo || '-'}</td>
                            <td style={{ fontWeight: 600, color: 'var(--primary-text)' }}>{student.NAME}</td>
+                           <td>
+                              <span className="badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-text)' }}>
+                                {student.academicYear || '-'}
+                              </span>
+                           </td>
                            <td>{student.CourseName}</td>
                            <td>{student.normalizedGender}</td>
                            <td>{student.STATE}</td>

@@ -7,7 +7,7 @@ import { DataProvider, useData } from './context/DataContext';
 import DashboardOverview from './pages/DashboardOverview';
 import CategoryDashboard from './pages/CategoryDashboard';
 import CategoryDetail from './pages/CategoryDetail';
-import DataQuality from './pages/DataQuality';
+import UploadHistory from './pages/UploadHistory';
 import FacultyList from './pages/FacultyList';
 import StudentsList from './pages/StudentsList';
 
@@ -38,8 +38,8 @@ function AppLayout() {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Faculty Registry', path: '/faculty', icon: Users },
     { name: 'Categories Compliance', path: '/categories', icon: FolderOpen },
-    { name: 'Data Quality', path: '/quality', icon: AlertOctagon },
-    { name: 'Student Data', path: '/students', icon: Users }
+    { name: 'Student Data', path: '/students', icon: Users },
+    { name: 'Upload Status', path: '/history', icon: AlertOctagon },
   ];
 
   return (
@@ -83,13 +83,22 @@ function AppLayout() {
               <select 
                  className="input-field" 
                  style={{ width: '100%', fontSize: '0.8rem', padding: '0.35rem 0.5rem', minHeight: 'auto' }}
-                 onChange={(e) => window.currentTargetDataset = e.target.value}
-                 defaultValue="2026-2027"
+                 onChange={(e) => {
+                    const [t, y] = e.target.value.split('|');
+                    window.currentTargetDataset = { type: t, year: y };
+                 }}
+                 defaultValue="faculty|2026-2027"
               >
-                  <option value="2026-2027">Faculty 2026-2027</option>
-                  <option value="2025-2026">Faculty 2025-2026</option>
-                  <option value="2024-2025">Faculty 2024-2025</option>
-                  <option value="Students">Student Details Database</option>
+                  <optgroup label="Faculty Arrays">
+                    <option value="faculty|2026-2027">Faculty 2026-2027</option>
+                    <option value="faculty|2025-2026">Faculty 2025-2026</option>
+                    <option value="faculty|2024-2025">Faculty 2024-2025</option>
+                  </optgroup>
+                  <optgroup label="Student Arrays">
+                    <option value="student|2026-2027">Students 2026-2027</option>
+                    <option value="student|2025-2026">Students 2025-2026</option>
+                    <option value="student|2024-2025">Students 2024-2025</option>
+                  </optgroup>
               </select>
            </div>
            
@@ -101,7 +110,7 @@ function AppLayout() {
              id="file-upload"
              accept=".xlsx, .xls"
              style={{ display: 'none' }}
-             onChange={(e) => handleFileUpload(e, window.currentTargetDataset || '2026-2027')}
+             onChange={(e) => handleFileUpload(e, window.currentTargetDataset || { type: 'faculty', year: '2026-2027' })}
            />{lastUpdated && (
              <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                <strong>Data Source:</strong> {fileName}<br/>
@@ -133,7 +142,8 @@ function AppLayout() {
                 <Route path="/faculty" element={<FacultyList />} />
                 <Route path="/categories" element={<CategoryDashboard />} />
                 <Route path="/categories/:id" element={<CategoryDetail />} />
-                <Route path="/quality" element={<DataQuality />} />
+                <Route path="/quality" element={<UploadHistory />} />
+                <Route path="/history" element={<UploadHistory />} />
                 <Route path="/students" element={<StudentsList />} />
              </Routes>
           )}
