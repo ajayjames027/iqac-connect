@@ -3,12 +3,15 @@ import { parseExcelData } from '../utils/excelParser';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase';
 import { doc, getDocs, getDoc, setDoc, collection } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
 
 const DataContext = createContext();
 
 export const useData = () => useContext(DataContext);
 
 export const DataProvider = ({ children }) => {
+  const { currentUser } = useAuth();
+  
   const [facultyData, setFacultyData] = useState([]);
   const [studentData, setStudentData] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -34,7 +37,12 @@ export const DataProvider = ({ children }) => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // Load persisted data on mount from Firestore Live Database
+    // Only fetch database if someone is actively logged in to avoid Missing Permission Firestore rules
+    if (!currentUser) {
+        setIsInitializing(false);
+        return;
+    }
+
     const loadPersistedData = async () => {
        try {
            const metaDoc = await getDoc(doc(db, 'iqac', 'meta'));
@@ -61,7 +69,6 @@ export const DataProvider = ({ children }) => {
                if (docSnap.data().data) sData.push(...JSON.parse(docSnap.data().data));
            });
            
-        // DB load success
         if (fData.length > 0 || sData.length > 0) {
             setFacultyData(fData);
             setStudentData(sData);
@@ -78,7 +85,7 @@ export const DataProvider = ({ children }) => {
     setIsInitializing(false);
   };
   loadPersistedData();
-}, []);
+}, [currentUser]);
 
 const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027' }) => {
     const file = e.target.files[0];
