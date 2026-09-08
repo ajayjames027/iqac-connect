@@ -5,7 +5,7 @@ import { Users, BookOpen, Clock, FileCheck, Layers, Sun, Moon } from 'lucide-rea
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function DashboardOverview() {
-  const { facultyData, categories, setFilters } = useData();
+  const { facultyData, categories, filters, setFilters } = useData();
   const navigate = useNavigate();
 
   if (!facultyData.length) return null;
