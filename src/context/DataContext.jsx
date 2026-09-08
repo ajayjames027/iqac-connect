@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { parseExcelData } from '../utils/excelParser';
+import * as XLSX from 'xlsx';
 
 const DataContext = createContext();
 
@@ -7,15 +8,15 @@ export const useData = () => useContext(DataContext);
 
 export const DataProvider = ({ children }) => {
   const [facultyData, setFacultyData] = useState([]);
+  const [studentData, setStudentData] = useState([]);
   const [categories, setCategories] = useState([]);
   const [dataQuality, setDataQuality] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fileName, setFileName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
+  
   const [filters, setFilters] = useState({
     search: '',
+    academicYear: 'All',
     department: 'All',
     facultyType: 'All',
     designation: 'All',
@@ -26,33 +27,67 @@ export const DataProvider = ({ children }) => {
     shift: 'All'
   });
 
-  const uploadExcel = async (file) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const buffer = await file.arrayBuffer();
-      const { data, categories: parsedCategories, dataQuality: dq } = parseExcelData(buffer);
-      
-      setFacultyData(data);
-      setCategories(parsedCategories);
-      setDataQuality(dq);
-      setFileName(file.name);
-      setLastUpdated(new Date().toLocaleString());
-      
-      // Save minimal info to local storage just to persist state on refresh if desired, or just keep it in memory
-      
-    } catch (err) {
-      console.error(err);
-      setError('Upload failed: ' + err.message);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleFileUpload = (e, targetDataset = '2026-2027') => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setLastUpdated(new Date().toLocaleString());
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
+        
+        let targetSheet = wb.SheetNames[0]; // fallback
+        if (targetDataset === 'Students') {
+             // For students, just store the first sheet raw for now
+             const ws = wb.Sheets[targetSheet];
+             const data = XLSX.utils.sheet_to_json(ws);
+             setStudentData(data);
+             return;
+        }
+
+        // It's a faculty upload
+        const ws = wb.Sheets[targetSheet];
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const { processedData, categories: extractedCat, quality } = parseExcelData(rawData);
+
+        // Stamp with academic year based on selection
+        const stampedData = processedData.map(f => ({ ...f, academicYear: targetDataset }));
+
+        setCategories(prev => {
+           let allCaps = new Set([...prev, ...extractedCat]);
+           return Array.from(allCaps);
+        });
+        
+        setDataQuality(quality);
+        
+        setFacultyData(prev => {
+            // Remove any old rows that had this same academic year so we can safely "Update"
+            const filteredPrev = prev.filter(p => p.academicYear !== targetDataset);
+            // Re-index safe IDs
+            const merged = [...filteredPrev, ...stampedData].map((f, i) => ({ ...f, id: i }));
+            return merged;
+        });
+      } catch (err) {
+        console.error('Error parsing excel:', err);
+        alert('Failed to parse Excel file. Ensure it matches the expected structure.');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // reset
   };
 
   const getFilteredData = (additionalFilters = {}) => {
     return facultyData.filter(faculty => {
+      // Academic Year
+      const activeYear = additionalFilters.academicYear || filters.academicYear;
+      if (activeYear && activeYear !== 'All' && faculty.academicYear !== activeYear) return false;
+
       // Search
-      const activeSearch = filters.search || additionalFilters.search || '';
+      const activeSearch = additionalFilters.search ?? filters.search;
       if (activeSearch) {
         const searchLower = activeSearch.toLowerCase();
         const matchesName = faculty.name?.toLowerCase().includes(searchLower);
@@ -67,7 +102,6 @@ export const DataProvider = ({ children }) => {
 
       // Faculty Type
       const activeType = additionalFilters.facultyType || filters.facultyType;
-      // Since type in the data might be comma separated or nested depending on mapping, we do includes check
       if (activeType && activeType !== 'All' && !faculty.facultyType?.includes(activeType)) return false;
       
       // Designation
@@ -106,14 +140,6 @@ export const DataProvider = ({ children }) => {
       const activeShift = additionalFilters.shift || filters.shift;
       if (activeShift && activeShift !== 'All' && faculty.shift !== activeShift) return false;
 
-      // Custom Category Filter
-      if (additionalFilters.categoryName && additionalFilters.status) {
-         let val = faculty.categories[additionalFilters.categoryName] || 'Not Applicable';
-         // simple match or standard mapping could go here.
-         // For now exact match or status mapped
-         // See classifyStatus in parser if we want standardized mapping
-      }
-
       return true;
     });
   };
@@ -128,18 +154,18 @@ export const DataProvider = ({ children }) => {
 
   const value = {
     facultyData,
+    setFacultyData,
+    studentData,
+    setStudentData,
     categories,
     dataQuality,
     lastUpdated,
     fileName,
-    isLoading,
-    error,
-    uploadExcel,
     filters,
     setFilters,
+    handleFileUpload,
     getFilteredData,
-    getUniqueValues,
-    hasData: facultyData.length > 0
+    getUniqueValues
   };
 
   return (

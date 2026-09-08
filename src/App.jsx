@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderOpen, AlertOctagon, Upload, Sun, Moon, Search } from 'lucide-react';
+import { LayoutDashboard, Users, FolderOpen, AlertOctagon, Upload, Sun, Moon, Search, BookOpen } from 'lucide-react';
 import { DataProvider, useData } from './context/DataContext';
 
 // Pages
@@ -21,9 +21,11 @@ export default function App() {
 }
 
 function AppLayout() {
-  const { uploadExcel, lastUpdated, fileName, error, hasData } = useData();
+  const { handleFileUpload, lastUpdated, fileName, facultyData, studentData } = useData();
   const location = useLocation();
   const [theme, setTheme] = useState('light');
+  
+  const hasData = facultyData.length > 0 || studentData.length > 0;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -31,16 +33,12 @@ function AppLayout() {
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) uploadExcel(file);
-  };
-
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Faculty (26-27)', path: '/faculty', icon: Users },
+    { name: 'Faculty Registry', path: '/faculty', icon: Users },
     { name: 'Categories Compliance', path: '/categories', icon: FolderOpen },
     { name: 'Data Quality', path: '/quality', icon: AlertOctagon },
+    { name: 'Student Data', path: '/students', icon: Users }
   ];
 
   return (
@@ -79,63 +77,83 @@ function AppLayout() {
         </nav>
 
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-           <label className="btn btn-primary" style={{ width: '100%', cursor: 'pointer' }}>
-             <Upload size={18} />
-             <span>Upload / Update</span>
-             <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ display: 'none' }} />
-           </label>
-           {lastUpdated && (
+           <div style={{ padding: '0 0.5rem', marginBottom: '1rem' }}>
+              <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Target Dataset:</label>
+              <select 
+                 className="input-field" 
+                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.35rem 0.5rem', minHeight: 'auto' }}
+                 onChange={(e) => window.currentTargetDataset = e.target.value}
+                 defaultValue="2026-2027"
+              >
+                  <option value="2026-2027">Faculty 2026-2027</option>
+                  <option value="2025-2026">Faculty 2025-2026</option>
+                  <option value="2024-2025">Faculty 2024-2025</option>
+                  <option value="Students">Student Details Database</option>
+              </select>
+           </div>
+           
+           <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => document.getElementById('file-upload').click()}>
+             <Upload size={18} /> Upload / Update
+           </button>
+           <input
+             type="file"
+             id="file-upload"
+             accept=".xlsx, .xls"
+             style={{ display: 'none' }}
+             onChange={(e) => handleFileUpload(e, window.currentTargetDataset || '2026-2027')}
+           />{lastUpdated && (
              <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                <strong>Data Source:</strong> {fileName}<br/>
                <strong>Updated:</strong> {lastUpdated}
              </div>
            )}
 
-           <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-              <p className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Coming Soon Architecture</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.5 }}>
-                    <FolderOpen size={16} /> Previous Years (23-25)
-                 </div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.5 }}>
-                    <Users size={16} /> Student Details DB
-                 </div>
-              </div>
-           </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="main-content">
         <header style={{ height: 'var(--header-height)', backgroundColor: 'var(--bg-surface-glass)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 2rem', zIndex: 10 }}>
-            {error && (
-               <div style={{ color: 'var(--danger-text)', marginRight: 'auto', fontWeight: 'bold' }}>
-                 {error}
-               </div>
-            )}
             <button onClick={toggleTheme} className="btn btn-outline" style={{ borderRadius: '50%', padding: '0.5rem' }}>
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
         </header>
-        
+
         <div className="content-scroll">
-          {!hasData && !error ? (
+          {!hasData ? (
              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
                 <Upload size={64} style={{ marginBottom: '1.5rem', opacity: 0.5 }} />
                 <h2 className="text-h2" style={{ marginBottom: '0.5rem' }}>No Data Available</h2>
-                <p>Please upload the Faculty Details Excel file to generate the dashboard.</p>
+                <p>Please upload the Faculty or Student Details Excel file using the sidebar.</p>
              </div>
           ) : (
-            <Routes>
-              <Route path="/" element={<DashboardOverview />} />
-              <Route path="/faculty" element={<FacultyList />} />
-              <Route path="/categories" element={<CategoryDashboard />} />
-              <Route path="/categories/:categoryName" element={<CategoryDetail />} />
-              <Route path="/quality" element={<DataQuality />} />
-            </Routes>
+             <Routes>
+                <Route path="/" element={<DashboardOverview />} />
+                <Route path="/faculty" element={<FacultyList />} />
+                <Route path="/categories" element={<CategoryDashboard />} />
+                <Route path="/categories/:id" element={<CategoryDetail />} />
+                <Route path="/quality" element={<DataQuality />} />
+                <Route path="/students" element={<StudentsList />} />
+             </Routes>
           )}
         </div>
       </main>
     </div>
   );
+}
+
+function StudentsList() {
+   const { studentData } = useData();
+   return (
+       <div className="animate-fade-in">
+           <h1 className="text-h1" style={{ marginBottom: '1rem' }}>Student Database</h1>
+           <div className="card">
+               {studentData.length > 0 ? (
+                  <p>Loaded {studentData.length} records. Ready to map student visual architecture!</p>
+               ) : (
+                  <p>No Student Data loaded. Please select "Student Details Database" in the sidebar and upload.</p>
+               )}
+           </div>
+       </div>
+   );
 }
