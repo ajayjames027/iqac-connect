@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { parseExcelData } from '../utils/excelParser';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
@@ -16,6 +16,7 @@ export const DataProvider = ({ children }) => {
   const [fileName, setFileName] = useState('');
   const [uploadHistory, setUploadHistory] = useState([]);
   
+  const hasLoadedFromDB = useRef(false);
   const [filters, setFilters] = useState({
     search: '',
     academicYear: 'All',
@@ -55,22 +56,26 @@ export const DataProvider = ({ children }) => {
        } catch(e) {
            console.error("LocalForage load error:", e);
        }
+       hasLoadedFromDB.current = true;
        setIsInitializing(false);
     };
     loadPersistedData();
   }, []);
 
-  // Save changes to localForage automatically
+  const syncDatabase = (fD, sD, c, fN, lU, dQ, uH) => {
+    localforage.setItem('iqac_facultyData', fD);
+    localforage.setItem('iqac_studentData', sD);
+    localforage.setItem('iqac_categories', c);
+    localforage.setItem('iqac_fileName', fN);
+    localforage.setItem('iqac_lastUpdated', lU);
+    localforage.setItem('iqac_dataQuality', dQ);
+    localforage.setItem('iqac_uploadHistory', uH);
+  };
+  
   useEffect(() => {
-    if (isInitializing) return;
-    localforage.setItem('iqac_facultyData', facultyData);
-    localforage.setItem('iqac_studentData', studentData);
-    localforage.setItem('iqac_categories', categories);
-    localforage.setItem('iqac_fileName', fileName);
-    localforage.setItem('iqac_lastUpdated', lastUpdated);
-    localforage.setItem('iqac_dataQuality', dataQuality);
-    localforage.setItem('iqac_uploadHistory', uploadHistory);
-  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory, isInitializing]);
+    if (!hasLoadedFromDB.current) return;
+    syncDatabase(facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory);
+  }, [facultyData, studentData, categories, fileName, lastUpdated, dataQuality, uploadHistory]);
 
   const handleFileUpload = (e, targetDataset = { type: 'faculty', year: '2026-2027' }) => {
     const file = e.target.files[0];
@@ -127,15 +132,20 @@ export const DataProvider = ({ children }) => {
         }
         
         // Push successful history log
-        setUploadHistory(prev => [{
+        const uHistObj = {
             id: Date.now(),
             filename: currentFileName,
             time: timestamp,
             type: targetDataset.type,
             year: targetDataset.year,
             count: countProcessed
-        }, ...prev]);
+        };
         
+        setUploadHistory(prev => {
+            const nextHistory = [uHistObj, ...prev];
+            return nextHistory;
+        });
+
       } catch (err) {
         console.error('Error parsing excel:', err);
         alert('Failed to parse Excel file. Ensure it matches the expected structure.');
