@@ -11,7 +11,7 @@ export default function StudentsList() {
    
    const normalizedStudentData = useMemo(() => {
        return studentData.map(s => {
-           let gen = s.GENDER || '';
+           let gen = s.GENDER ? s.GENDER.toString() : '';
            if (gen.toLowerCase() === 'female') gen = 'Female';
            else if (gen.toLowerCase() === 'male') gen = 'Male';
            return { ...s, normalizedGender: gen };
@@ -22,9 +22,13 @@ export default function StudentsList() {
        return normalizedStudentData.filter(student => {
            // Search Filter
            if (search) {
-               const searchLower = search.toLowerCase();
-               const nameMatch = student.NAME?.toLowerCase().includes(searchLower);
-               const admissionMatch = student['D.No.']?.toLowerCase().includes(searchLower) || student.SNo?.toString().includes(searchLower);
+               const searchLower = search.toString().toLowerCase();
+               const sName = student.NAME ? student.NAME.toString().toLowerCase() : '';
+               const sDno = student['D.No.'] ? student['D.No.'].toString().toLowerCase() : '';
+               const sSno = student.SNo ? student.SNo.toString().toLowerCase() : '';
+               
+               const nameMatch = sName.includes(searchLower);
+               const admissionMatch = sDno.includes(searchLower) || sSno.includes(searchLower);
                if (!nameMatch && !admissionMatch) return false;
            }
            
@@ -32,14 +36,14 @@ export default function StudentsList() {
            if (gender !== 'All' && student.normalizedGender !== gender) return false;
            
            // Course Filter
-           if (course !== 'All' && student.CourseName !== course) return false;
+           if (course !== 'All' && student.CourseName?.toString() !== course) return false;
            
            return true;
        });
    }, [normalizedStudentData, search, gender, course]);
    
    const courses = useMemo(() => {
-       const vals = normalizedStudentData.map(s => s.CourseName).filter(Boolean);
+       const vals = normalizedStudentData.map(s => s.CourseName ? s.CourseName.toString() : null).filter(Boolean);
        return ['All', ...new Set(vals)].sort();
    }, [normalizedStudentData]);
    
