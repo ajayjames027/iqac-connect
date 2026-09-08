@@ -3,14 +3,14 @@ import * as XLSX from 'xlsx';
 // Standardized mapping of core demographic fields to expected variations in Excel
 export const CORE_FIELDS = {
   id: ['S.No', 'SNo', 'Serial No', 'ID', 'Emp ID'],
-  name: ['Name of the Teaching Staff', 'Faculty Name', 'Name of Faculty', 'Staff Name'],
+  name: ['Name of the Teaching Staff', 'Name Of The Employee', 'Faculty Name', 'Name of Faculty', 'Staff Name'],
   department: ['Department', 'Dept'],
-  facultyType: ['Aided/Coordinator/Secretary', 'Aided', 'Faculty Type', 'Nature of Appointment'],
+  facultyType: ['Aided/Coordinator/Secretary', 'Nature Of Appointment', 'Faculty Type'],
   designation: ['Designation', 'Position', 'Role'],
-  qualification: ['Educational Qualification', 'Qualification'], // removed "Degree" to prevent overlap with "Doctoral Degree"
+  qualification: ['Educational Qualification', 'Highest Qualification', 'Qualification'], 
   gender: ['Gender', 'Sex'],
-  dateOfAppointment: ['Date of Appointment', 'DOJ', 'Date of Joining'],
-  experienceCategory: ['Category', 'Years of Experience Category'],
+  dateOfAppointment: ['Date of Appointment', 'Date of Joining', 'DOJ'],
+  experienceCategory: ['Category', 'Years of Experience Category', 'Year of Experience', 'Years of Experience'],
   phdGuide: ['PhD Guide Mention', 'Guide Mention', 'PhD Guide'],
   phdStatus: ['Doctoral Degree Yes/No', 'Doctoral Degree'],
   shift: ['Shift (I/II)', 'Shift']
@@ -67,27 +67,12 @@ export function parseExcelData(arrayBuffer) {
   
   let nameCount = {};
 
-  // For safety against bizarre header text structures, enforce strict indices for requested columns
-  // C (2) -> Faculty Type
-  // E (4) -> Gender
-  // I (8) -> Qualification
-  // K (10) -> PhD Status
-  // N (13) -> PhD Guide
-  const strictMappings = {
-      2: 'facultyType',
-      4: 'gender',
-      8: 'qualification',
-      10: 'phdStatus',
-      13: 'phdGuide'
-  };
-
+  // Core Dynamic mapping driven strictly by header strings. (Supports varied format structures across years)
   headers.forEach((h, idx) => {
     if (!h) return;
     const coreKey = findKey(h, CORE_FIELDS);
     
-    if (strictMappings[idx]) {
-        mappedCols[idx] = strictMappings[idx];
-    } else if (coreKey && !Object.values(mappedCols).includes(coreKey)) {
+    if (coreKey && !Object.values(mappedCols).includes(coreKey)) {
       mappedCols[idx] = coreKey;
     } else {
       // It's a potential compliance category or other status
